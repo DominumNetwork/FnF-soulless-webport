@@ -1,30 +1,4 @@
-import { EngineType } from './engineDetector';
-
-export const engineRepoMapping: Record<EngineType, string> = {
-  'Psych Engine': 'ShadowMario/FNF-PsychEngine',
-  'Codename Engine': 'CodenameCrew/CodenameEngine',
-  'Leather Engine': 'Leather128/LeatherEngine',
-  'JS Engine': 'JordanSantiagoYT/FNF-JS-Engine-Rewrite',
-  'Unknown': 'ShadowMario/FNF-PsychEngine'
-};
-
-export function generateGithubAction(engineRepo: string, hasVideos: boolean, filesToFix: string[], engineType: string): string {
-  let videoScript = hasVideos ? `
-      - name: Disable/Convert Videos (Web compatibility)
-        run: |
-          echo "Processing MP4 files to prevent web build crashes..."
-          find . -name "*.mp4" -type f -exec mv {} {}.disabled \\;
-` : "";
-
-  let jsEngineScript = (engineType === 'JS Engine' && filesToFix.length > 0) ? `
-      - name: Fix JS Engine Song Audio File Capitalization
-        run: |
-          echo "Enforcing case sensitivity for Voices.ogg and Inst.ogg in songs folders..."
-          find . -type f -iname "voices.ogg" -print0 | xargs -0 -I {} mv {} $(dirname {})/Voices.ogg
-          find . -type f -iname "inst.ogg" -print0 | xargs -0 -I {} mv {} $(dirname {})/Inst.ogg
-` : "";
-
-  return `name: Build FNF Web Port
+name: Build FNF Web Port
 
 on:
   workflow_dispatch:
@@ -43,7 +17,7 @@ jobs:
       - name: Checkout Base Engine
         uses: actions/checkout@v4
         with:
-          repository: '${engineRepo}'
+          repository: 'JordanSantiagoYT/FNF-JS-Engine-Rewrite'
           path: 'engine-source'
 
       - name: Download Mod Payload
@@ -51,7 +25,7 @@ jobs:
           echo "Downloading mod from URL provided..."
           pip install gdown --quiet
           
-          URL="\${{ github.event.inputs.mod_url }}"
+          URL="${{ github.event.inputs.mod_url }}"
           
           if [[ "$URL" == *"drive.google.com"* ]]; then
             gdown "$URL" -O mod-payload.zip
@@ -71,7 +45,13 @@ jobs:
           # Inject the uploaded mod files into the target directories
           cp -rn ../mods_upload/* mods/ || true
           cp -rn ../mods_upload/* assets/ || true
-${jsEngineScript}${videoScript}
+
+      - name: Fix JS Engine Song Audio File Capitalization
+        run: |
+          echo "Enforcing case sensitivity for Voices.ogg and Inst.ogg in songs folders..."
+          find . -type f -iname "voices.ogg" -print0 | xargs -0 -I {} mv {} $(dirname {})/Voices.ogg
+          find . -type f -iname "inst.ogg" -print0 | xargs -0 -I {} mv {} $(dirname {})/Inst.ogg
+
       - name: Setup Haxe
         uses: krdlab/setup-haxe@master
         with:
@@ -128,6 +108,4 @@ ${jsEngineScript}${videoScript}
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
           git commit -m "Automated Web Port Build"
-          git push --force "https://x-access-token:\${{ secrets.GITHUB_TOKEN }}@github.com/\${{ github.repository }}.git" HEAD:web-build
-`;
-}
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:web-build
